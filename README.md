@@ -1,64 +1,53 @@
-# Monocle Bridge
+# Monocle
 
-Bridges the proot CLI environment to the [Brilliant Monocle](https://docs.brilliant.xyz/monocle/monocle/) via Web Bluetooth so you can run MicroPython from the command line.
+Android bridge for a Brilliant Labs **Monocle**: foreground service, loopback HTTP, cards and stills on the waveguide.
 
-**Full documentation:** [docs/](docs/README.md) — architecture, setup, usage, API, development, troubleshooting.
+Repo: [actuallyrizzn/monocle](https://github.com/actuallyrizzn/monocle)
 
-*Documentation: CC BY-SA 4.0. Code: AGPLv3. See [LICENSE](LICENSE) and [LICENSE.markdown](LICENSE.markdown).*
+Replies go **on the lens**. There is no speaker on the glasses and this app does not play TTS.
 
-## How it works
+The February 2026 Python/HTML Web Bluetooth CLI lives in [`old/`](old/).
 
-```
-[proot]                    [Android Chrome]              [Monocle]
-  |                              |                           |
-  |  monocle-cli repl "1+1"       |                           |
-  |-------> WebSocket ----------->|  Web Bluetooth            |
-  |         (port 8766)            |  -------> BLE ----------->|
-  |                               |                           |
-  |         <-------- response <--|  <------ notify ----------|
-  |<------ WebSocket              |                           |
-```
-
-1. **server.py** runs in proot - HTTP on 8765 (serves bridge.html), WebSocket on 8766
-2. **Chrome** on the Android device loads http://127.0.0.1:8765
-3. The bridge page uses Web Bluetooth to connect to the Monocle
-4. **monocle-cli** in proot sends commands over WebSocket; the bridge relays to/from the Monocle
-
-## Setup
+## Install
 
 ```bash
-cd /root/monocle-bridge
-apt install python3-websockets   # or: pip install websockets
-python3 server.py               # leave running
+git clone https://github.com/actuallyrizzn/monocle.git
+cd monocle
+bash tools/assemble-debug-on-termux.sh
+python3 "$HOME/.otto-portable/tools/termux-single-file-serve/serve.py" \
+  app/build/outputs/apk/debug/MONOCLE-BRIDGE.apk --bind 0.0.0.0 --port 8775
 ```
 
-On the **same Android device**, open Chrome and go to: **http://127.0.0.1:8765**
+Do **not** copy the APK to Downloads. Force-stop **Noa** before Start. Grant Bluetooth (and mic if you want the phone-STT fallback). Leave the notification running.
 
-Click "Connect to Monocle" and select your device when prompted.
+Current app: **0.5.26**. Loopback HTTP: `http://127.0.0.1:8767` (not 8765).
 
-## Usage
+Idle uses `device.hibernate` (Bluetooth stays; FPGA / 10V / camera analog off). Application-only DFU (`POST /v1/firmware`). Do not flash below **40%**. Recovery zip is Brilliant’s GitHub **v23.248.0754** release.
 
-```bash
-# Connect (run once after opening bridge page)
-python3 monocle-cli.py connect
+On BLE up: connect splash, then blank after 20s. Camera snaps re-init the sensor after FPGA-off idle, then hibernate again. Do not shoot the camera on a dying cell.
 
-# Run Python on the Monocle
-python3 monocle-cli.py repl "1+1"
-python3 monocle-cli.py repl "print('hello')"
+## Hooks
 
-# Pipe code
-echo "import display; display.text('hi')" | python3 monocle-cli.py repl
-```
+| Call | What it drives |
+|---|---|
+| `GET /health` | BLE, raw-data service, listen, route list |
+| `POST /v1/connect` | Scan / reconnect |
+| `POST /v1/display` | Card on the waveguide: `{text, subject, from}` |
+| `POST /v1/display/clear` | Blank the lens |
+| `POST /v1/display/brightness` | `{level:0-4}` |
+| `GET /v1/sensors` | Battery, charging, version, touch, FPGA |
+| `POST /v1/led` | `{color:GREEN\|RED, on:true}` |
+| `GET /v1/touch` | Touch pads right now |
+| `POST /v1/mic` | `{seconds:2}` glasses mic → WAV + VAD |
+| `POST /v1/camera` | JPEG snapshot (Noa `ist:`/`idt:`/`ien:`) |
+| `POST /v1/firmware/zip` | Stage an application DFU zip |
+| `POST /v1/firmware` | Flash staged zip (or bundled) |
+| `POST /v1/listen/start` | Loop: record, energy-VAD, keep last WAV |
+| `GET /v1/listen/utterance.wav` | Last clip |
+| `POST /v1/stt/phone` | Android recognizer on the **phone** mic. Optional. |
+| `POST /v1/repl` | Raw MicroPython |
+| `GET /v1/presence` | Moya flag as the phone sees it. No secrets. |
 
-## Testing
+## License
 
-```bash
-pytest tests/ -v
-pytest tests/ --cov=. --cov-fail-under=80
-```
-
-## Requirements
-
-- proot shares network with Android host (127.0.0.1 reaches the phone)
-- Chrome on Android with Web Bluetooth support
-- Monocle powered on and in range
+AGPLv3 for code (`LICENSE`). The archived CLI in `old/` is the same.

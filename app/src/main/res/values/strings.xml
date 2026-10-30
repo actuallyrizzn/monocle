@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Monocle Bridge</string>
+    <string name="grant_bt">Grant Bluetooth + mic</string>
+    <string name="start">Start bridge</string>
+    <string name="stop">Stop bridge</string>
+    <string name="curl_hint">Force-stop Noa first.\nOtto hits http://127.0.0.1:%1$d\nCards keep subject, from, battery.\nMoya heartbeat runs in this app.</string>
+</resources>
