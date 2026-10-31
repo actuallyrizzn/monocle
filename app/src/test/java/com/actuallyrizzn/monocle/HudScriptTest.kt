@@ -50,15 +50,17 @@ class HudScriptTest {
         assertTrue(plan.first().contains("open('op.py'"))
         assertTrue(plan.last().startsWith("f.close()"))
         assertTrue(plan.last().contains("print('WROTE',${HudScript.sourceBytes().size})"))
-        val hex = StringBuilder()
-        val unhex = Regex("unhexlify\\('([0-9a-f]+)'\\)")
+        val rebuilt = java.io.ByteArrayOutputStream()
+        val b64 = Regex("a2b_base64\\('([A-Za-z0-9+/=]+)'\\)")
         for (cmd in plan) {
             assertTrue("paste too large: ${cmd.length}", cmd.length < 400)
-            val m = unhex.find(cmd)
-            if (m != null) hex.append(m.groupValues[1])
+            assertFalse(cmd.contains("unhexlify"))
+            val m = b64.find(cmd)
+            if (m != null) {
+                rebuilt.write(java.util.Base64.getDecoder().decode(m.groupValues[1]))
+            }
         }
-        val rebuilt = hex.toString().chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        assertArrayEquals(HudScript.sourceBytes(), rebuilt)
+        assertArrayEquals(HudScript.sourceBytes(), rebuilt.toByteArray())
     }
 
     @Test

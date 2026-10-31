@@ -7,7 +7,8 @@ package com.actuallyrizzn.monocle
 object HudScript {
     const val VERSION = "op-v2"
     const val FILE = "op.py"
-    const val CHUNK_BYTES: Int = 64
+    /** Binary paste size. Multiple of 3 so base64 stays padded. This firmware has no unhexlify. */
+    const val CHUNK_BYTES: Int = 120
 
     const val SOURCE = """
 # op-v2
@@ -257,12 +258,16 @@ print('PROBE', d)
      */
     fun writePlan(chunkBytes: Int = CHUNK_BYTES): List<String> {
         val bytes = sourceBytes()
-        val hex = bytes.joinToString("") { b -> "%02x".format(b.toInt() and 0xFF) }
-        val width = (chunkBytes.coerceAtLeast(8)) * 2
-        val out = ArrayList<String>(2 + (hex.length + width - 1) / width)
+        val width = (chunkBytes.coerceAtLeast(12)).let { it - (it % 3) }
+        val out = ArrayList<String>(2 + (bytes.size + width - 1) / width)
         out.add("import ubinascii\nf=open('op.py','wb')\nprint('OPEN')")
-        for (chunk in hex.chunked(width)) {
-            out.add("f.write(ubinascii.unhexlify('$chunk'))\nprint('W',${chunk.length / 2})")
+        var i = 0
+        while (i < bytes.size) {
+            val end = minOf(i + width, bytes.size)
+            val piece = bytes.copyOfRange(i, end)
+            val b64 = java.util.Base64.getEncoder().encodeToString(piece)
+            out.add("f.write(ubinascii.a2b_base64('$b64'))\nprint('W',${piece.size})")
+            i = end
         }
         out.add("f.close()\nprint('WROTE',${bytes.size})")
         return out
