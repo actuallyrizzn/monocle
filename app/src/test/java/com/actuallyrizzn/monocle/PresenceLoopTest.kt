@@ -90,6 +90,46 @@ class PresenceLoopTest {
     }
 
     @Test
+    fun skipsWhenNotConfigured() {
+        val client = PresenceClient("", "") { _, _, _, _ -> error("no http") }
+        val loop = PresenceLoop(
+            client = client,
+            connected = { true },
+            deviceName = { "monocle" },
+            paint = { _, _, _ -> error("should not paint") },
+        )
+        assertEquals(0, loop.tick())
+        assertFalse(loop.lastOn)
+        assertEquals("presence_not_configured", loop.lastError)
+    }
+
+    @Test
+    fun listenFlagRunsAskNotPaint() {
+        val asked = mutableListOf<String>()
+        val client = PresenceClient("http://127.0.0.1:8890", "k") { method, url, _, _ ->
+            when {
+                url.endsWith("/v1/heartbeat") -> """{"ok":true,"on":true}"""
+                url.endsWith("/v1/pull") ->
+                    """{"ok":true,"on":true,"messages":[{"id":7,"text":"Say the word","sender":"Athena","subject":"Ask","listen":true}]}"""
+                url.endsWith("/v1/ack") -> """{"ok":true,"removed":1}"""
+                else -> error("$method $url")
+            }
+        }
+        val loop = PresenceLoop(
+            client = client,
+            connected = { true },
+            deviceName = { "monocle" },
+            paint = { _, _, _ -> error("status paint should not run") },
+            ask = { text, _, _ ->
+                asked += text
+                true
+            },
+        )
+        assertEquals(1, loop.tick())
+        assertEquals(listOf("Say the word"), asked)
+    }
+
+    @Test
     fun failedPaintIsNotAcked() {
         val client = PresenceClient("http://127.0.0.1:8890", "k") { method, url, _, _ ->
             when {

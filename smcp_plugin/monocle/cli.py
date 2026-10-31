@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""SMCP plugin: monocle — status and send to Mark's waveguide when the flag is on.
+"""SMCP plugin: monocle — status and send to the waveguide when the flag is on.
 
-Talks to the Moya presence HTTP API (loopback). Agents do not dial the phone.
+Talks to a presence HTTP API. Set MONOCLE_PRESENCE_URL. Agents do not dial the phone.
 """
 
 from __future__ import annotations
@@ -15,14 +15,13 @@ import urllib.request
 from typing import Any, Dict, Optional
 
 PLUGIN_VERSION = "0.1.0"
-DEFAULT_BASE = "http://127.0.0.1:8890"
 
 
 def _base_url() -> str:
     return (
         os.environ.get("MONOCLE_PRESENCE_URL")
         or os.environ.get("MONOCLE_PRESENCE_BASE_URL")
-        or DEFAULT_BASE
+        or ""
     ).rstrip("/")
 
 
@@ -40,7 +39,7 @@ def get_plugin_description() -> Dict[str, Any]:
             "name": "monocle",
             "version": PLUGIN_VERSION,
             "description": (
-                "Mark's Brilliant Monocle. status = is he wearing it (Moya flag). "
+                "Brilliant Monocle. status = is the presence flag on. "
                 "send = put a sentence on the waveguide. Fails cleanly if the flag is off."
             ),
         },
@@ -53,7 +52,8 @@ def get_plugin_description() -> Dict[str, Any]:
             {
                 "name": "send",
                 "description": (
-                    "Queue text for the waveguide. Scrolls on-device if longer than one screen. "
+                    "Queue text for the waveguide. listen=false is a status card. "
+                    "listen=true is an ask: glasses mic records up to the app cap, then rails down. "
                     "Returns monocle_off if the flag is off — not a fake success."
                 ),
                 "parameters": [
@@ -78,6 +78,16 @@ def get_plugin_description() -> Dict[str, Any]:
                         "required": False,
                         "default": "",
                     },
+                    {
+                        "name": "listen",
+                        "type": "boolean",
+                        "description": (
+                            "If true, this is an ask card: glasses mic records for the app "
+                            "record-limit, then the card goes dark. Default false is status-only."
+                        ),
+                        "required": False,
+                        "default": False,
+                    },
                 ],
             },
         ],
@@ -86,13 +96,14 @@ def get_plugin_description() -> Dict[str, Any]:
 
 def _request(method: str, path: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     key = _api_key()
-    if not key:
+    base = _base_url()
+    if not key or not base:
         return {
             "status": "error",
-            "error": "Set MONOCLE_PRESENCE_API_KEY",
+            "error": "Set MONOCLE_PRESENCE_URL and MONOCLE_PRESENCE_API_KEY",
             "error_type": "misconfigured",
         }
-    url = _base_url() + path
+    url = base + path
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url,
@@ -146,6 +157,9 @@ def cmd_send(args: Dict[str, Any]) -> Dict[str, Any]:
     text = (args.get("text") or "").strip()
     if not text:
         return {"status": "error", "error": "missing_text", "error_type": "validation_error"}
+    listen = args.get("listen", False)
+    if isinstance(listen, str):
+        listen = listen.strip().lower() in ("1", "true", "yes", "on")
     return _request(
         "POST",
         "/v1/send",
@@ -153,6 +167,7 @@ def cmd_send(args: Dict[str, Any]) -> Dict[str, Any]:
             "text": text,
             "sender": (args.get("sender") or "agent").strip() or "agent",
             "subject": (args.get("subject") or "").strip(),
+            "listen": bool(listen),
         },
     )
 
@@ -166,6 +181,7 @@ def main() -> int:
     send.add_argument("--text", required=True)
     send.add_argument("--sender", default="agent")
     send.add_argument("--subject", default="")
+    send.add_argument("--listen", action="store_true")
     args = parser.parse_args()
     if args.describe:
         print(json.dumps(get_plugin_description(), indent=2))

@@ -13,6 +13,8 @@ object MonocleApi {
         "v1/led",
         "v1/touch",
         "v1/mic",
+        "v1/ask",
+        "v1/record-limit",
         "v1/camera",
         "v1/raw",
         "v1/stt/phone",

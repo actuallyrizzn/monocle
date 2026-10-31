@@ -65,6 +65,18 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(ack["removed"], 1)
         self.assertEqual(s.pull()["messages"], [])
 
+    def test_listen_flag_is_on_the_queued_card(self):
+        s = PresenceStore(clock=FakeClock())
+        s.heartbeat(True)
+        out = s.send("Say the word", sender="athena", subject="Ask", listen=True)
+        self.assertTrue(out["ok"])
+        msg = s.pull()["messages"][0]
+        self.assertTrue(msg["listen"])
+        self.assertEqual(msg["text"], "Say the word")
+        quiet = s.send("Just a status")
+        self.assertTrue(quiet["ok"])
+        self.assertFalse(s.pull()["messages"][1]["listen"])
+
     def test_empty_text(self):
         s = PresenceStore(clock=FakeClock())
         s.heartbeat(True)

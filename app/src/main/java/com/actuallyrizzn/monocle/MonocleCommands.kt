@@ -147,7 +147,7 @@ else:
         "import touch\nprint('TOUCH',touch.state())"
 
     fun micRecord(seconds: Double, sampleRate: Int, bitDepth: Int): String {
-        val sec = seconds.coerceIn(0.5, 4.0)
+        val sec = RecordLimit.clamp(seconds)
         val rate = if (sampleRate >= 12000) 16000 else 8000
         val depth = if (bitDepth >= 12) 16 else 8
         val secLit = String.format(Locale.US, "%.1f", sec)

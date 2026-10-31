@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -13,20 +11,9 @@ android {
         applicationId = "com.actuallyrizzn.monocle"
         minSdk = 26
         targetSdk = 34
-        versionCode = 37
-        versionName = "0.5.28"
+        versionCode = 40
+        versionName = "0.5.31"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        val localProps = Properties()
-        val lp = rootProject.file("local.properties")
-        if (lp.exists()) {
-            lp.inputStream().use { localProps.load(it) }
-        }
-        fun esc(value: String): String =
-            value.replace("\\", "\\\\").replace("\"", "\\\"")
-        val presenceUrl = localProps.getProperty("presence.url", "http://127.0.0.1:8890")
-        val presenceKey = localProps.getProperty("presence.apiKey", "")
-        buildConfigField("String", "PRESENCE_URL", "\"${esc(presenceUrl)}\"")
-        buildConfigField("String", "PRESENCE_API_KEY", "\"${esc(presenceKey)}\"")
     }
 
     buildTypes {

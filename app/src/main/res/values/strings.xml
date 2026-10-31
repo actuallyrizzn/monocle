@@ -4,5 +4,12 @@
     <string name="grant_bt">Grant Bluetooth + mic</string>
     <string name="start">Start bridge</string>
     <string name="stop">Stop bridge</string>
-    <string name="curl_hint">Force-stop Noa first.\nOtto hits http://127.0.0.1:%1$d\nCards keep subject, from, battery.\nMoya heartbeat runs in this app.</string>
+    <string name="record_limit">Record limit (seconds, 1–8)</string>
+    <string name="save_record_limit">Save record limit</string>
+    <string name="presence_url">Presence URL</string>
+    <string name="presence_url_hint">https://host:port</string>
+    <string name="presence_key">Presence API key</string>
+    <string name="presence_key_hint">leave blank to keep the saved key</string>
+    <string name="save_presence">Save presence</string>
+    <string name="curl_hint">Force-stop Noa first.\nLoopback HTTP is http://127.0.0.1:%1$d\nCards keep subject, from, battery.\nPresence is optional: set URL and key on this screen.\nAsk cards record a fixed take; cap is on this screen.</string>
 </resources>

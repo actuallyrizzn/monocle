@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -35,6 +36,31 @@ class MainActivity : AppCompatActivity() {
         status = findViewById(R.id.status)
         hint = findViewById(R.id.hint)
         findViewById<TextView>(R.id.version).text = "version ${BuildConfig.VERSION_NAME}"
+        val limitField = findViewById<EditText>(R.id.recordLimit)
+        val limitPrefs = RecordLimitPrefs(this)
+        limitField.setText(limitPrefs.seconds().toString())
+        findViewById<Button>(R.id.btnRecordLimit).setOnClickListener {
+            val parsed = limitField.text.toString().toDoubleOrNull() ?: RecordLimit.DEFAULT
+            limitPrefs.save(parsed)
+            limitField.setText(limitPrefs.seconds().toString())
+            hint.text = hintText(limitPrefs)
+        }
+        val presencePrefs = PresencePrefs(this)
+        val urlField = findViewById<EditText>(R.id.presenceUrl)
+        val keyField = findViewById<EditText>(R.id.presenceKey)
+        urlField.setText(presencePrefs.url())
+        findViewById<Button>(R.id.btnPresence).setOnClickListener {
+            val typedKey = keyField.text.toString()
+            presencePrefs.save(urlField.text.toString(), typedKey.ifBlank { null })
+            urlField.setText(presencePrefs.url())
+            keyField.text.clear()
+            val client = MonocleService.presenceClient
+            if (client != null) {
+                client.baseUrl = presencePrefs.url()
+                client.apiKey = presencePrefs.apiKey()
+            }
+            hint.text = hintText(limitPrefs, presencePrefs)
+        }
         findViewById<Button>(R.id.btnStart).setOnClickListener {
             if (!hasBtPerms()) {
                 permissionLauncher.launch(neededPermissions())
@@ -51,8 +77,22 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnPermissions).setOnClickListener {
             permissionLauncher.launch(neededPermissions())
         }
-        hint.text = getString(R.string.curl_hint, MonocleCommands.HTTP_PORT)
+        hint.text = hintText(limitPrefs, presencePrefs)
         refresh()
+    }
+
+    private fun hintText(
+        limitPrefs: RecordLimitPrefs,
+        presencePrefs: PresencePrefs = PresencePrefs(this),
+    ): String {
+        val presence = if (presencePrefs.configured()) {
+            "Presence ${presencePrefs.url()} · key saved"
+        } else {
+            "Presence not set"
+        }
+        return getString(R.string.curl_hint, MonocleCommands.HTTP_PORT) +
+            "\nRecord limit ${limitPrefs.seconds()}s" +
+            "\n$presence"
     }
 
     override fun onResume() {

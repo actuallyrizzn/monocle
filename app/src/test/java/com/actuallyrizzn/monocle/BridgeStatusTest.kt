@@ -34,6 +34,8 @@ class BridgeStatusTest {
         )
         assertTrue(text.startsWith("version 0.5.10"))
         assertTrue(text.contains("lens: not connected"))
+        assertTrue(text.contains("presence: off"))
+        assertFalse(text.contains("Moya"))
         assertFalse(text.contains("lens: connected"))
         assertFalse(text.lines()[2].contains("connected monocle"))
     }

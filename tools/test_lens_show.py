@@ -40,7 +40,7 @@ class WrapTests(unittest.TestCase):
 
     def test_card_has_chrome_not_rail(self):
         code = card_code(
-            "Still building the Moya flag.",
+            "Still building the presence flag.",
             sender="Otto",
             subject="Sanctum",
         )
@@ -53,7 +53,7 @@ class WrapTests(unittest.TestCase):
         self.assertIn("display.Text(W,0,50,", code)
         self.assertNotIn("display.Fill(", code)
         self.assertNotIn("display.Rectangle(", code)
-        self.assertTrue(all(len(line) <= COLS for line in wrap("Still building the Moya flag.")))
+        self.assertTrue(all(len(line) <= COLS for line in wrap("Still building the presence flag.")))
 
 
 if __name__ == "__main__":

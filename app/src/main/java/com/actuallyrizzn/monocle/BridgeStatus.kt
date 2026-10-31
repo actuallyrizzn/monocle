@@ -32,8 +32,8 @@ object BridgeStatus {
         val perm = if (bluetoothGranted) "bluetooth granted" else "bluetooth NOT granted"
         val presence = when {
             presenceOn == null -> "presence idle"
-            presenceOn -> "Moya: on"
-            else -> "Moya: off" + (presenceError?.let { " · $it" } ?: "")
+            presenceOn -> "presence: on"
+            else -> "presence: off" + (presenceError?.let { " · $it" } ?: "")
         }
         return buildString {
             append("version ").append(version).append('\n')

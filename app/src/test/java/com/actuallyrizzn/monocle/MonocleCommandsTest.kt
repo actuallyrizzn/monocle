@@ -86,6 +86,8 @@ class MonocleCommandsTest {
         assertFalse(MonocleApi.ROUTES.contains("v1/tts"))
         assertTrue(MonocleApi.ROUTES.contains("v1/listen/start"))
         assertTrue(MonocleApi.ROUTES.contains("v1/mic"))
+        assertTrue(MonocleApi.ROUTES.contains("v1/ask"))
+        assertTrue(MonocleApi.ROUTES.contains("v1/record-limit"))
         assertTrue(MonocleApi.ROUTES.contains("v1/camera"))
         assertTrue(MonocleApi.ROUTES.contains("v1/raw"))
         assertTrue(MonocleApi.ROUTES.contains("v1/sensors"))

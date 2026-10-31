@@ -31,8 +31,8 @@ object MicCapture {
         sampleRate: Int,
         bitDepth: Int,
     ): Utterance {
-        val sec = seconds.coerceIn(0.5, 4.0)
-        val timeout = (sec * 1000).toLong() + 12_000L
+        val sec = RecordLimit.clamp(seconds)
+        val timeout = (sec * 1000).toLong() + 15_000L
         val collected = ble.execCollectRaw(
             MonocleCommands.micRecord(sec, sampleRate, bitDepth),
             timeoutMs = timeout,

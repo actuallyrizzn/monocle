@@ -22,6 +22,9 @@ BODY_ROWS=6
 BRIGHT=0
 SEP=b'\x1e'
 acc=b''
+LS='Monocle'
+LW='-'
+LT=' '
 def snd(m):
  while True:
   try:
@@ -71,12 +74,35 @@ def wrap(t):
  return lines or [' ']
 def blank():
  nap()
+def gauge(p):
+ import display
+ display.brightness(BRIGHT)
+ if p<0: p=0
+ if p>1: p=1
+ w=1+int(639*p)
+ S=clip(LS,SUBJ_COLS)
+ W=clip(LW,COLS)
+ B=wrap(LT)
+ b=str(device.battery_level())+'%'
+ if len(b)>BAT_COLS:
+  b=b[:BAT_COLS]
+ bx=640-len(b)*24
+ o=[display.Text(S,0,0,0x29D0D0),display.Text(b,bx,0,0xFFEE33),display.Text(W,0,LINE_H,0xFFEE33),display.HLine(0,392,w,0x29D0D0,4)]
+ i=0
+ while i<BODY_ROWS and i<len(B):
+  o.append(display.Text(B[i],0,BODY_Y+i*LINE_H,0xFFFFFF))
+  i+=1
+ display.show(o)
 def paint(subj,who,text):
+ global LS,LW,LT
  wake()
  import display
  display.brightness(BRIGHT)
  S=clip(subj,SUBJ_COLS)
  W=clip(who,COLS)
+ LS=S
+ LW=W
+ LT=text
  B=wrap(text)
  b=str(device.battery_level())+'%'
  if len(b)>BAT_COLS:
@@ -138,23 +164,32 @@ def do_mic(rest):
  wake()
  import microphone
  try:
-  sec=float(dec(rest) or '2')
+  sec=float(dec(rest) or '4')
  except:
-  sec=2.0
- if sec<0.5:
-  sec=0.5
- if sec>4:
-  sec=4
- microphone.record(seconds=sec,sample_rate=8000,bit_depth=8)
- time.sleep(sec+0.6)
- snd(b'ast:')
- n=bluetooth.max_length()-4
- while True:
-  d=microphone.read(n)
-  if d is None:
-   break
-  snd(b'dat:'+d)
- snd(b'aen:')
+  sec=4.0
+ if sec<1:
+  sec=1.0
+ if sec>8:
+  sec=8
+ try:
+  microphone.record(seconds=sec,sample_rate=8000,bit_depth=8)
+  t0=time.ticks_ms()
+  tot=int(sec*1000)
+  while time.ticks_diff(time.ticks_ms(),t0)<tot:
+   gauge(time.ticks_diff(time.ticks_ms(),t0)/tot)
+   time.sleep_ms(180)
+  gauge(1)
+  time.sleep_ms(400)
+  snd(b'ast:')
+  n=min(bluetooth.max_length()-4,127)
+  while True:
+   d=microphone.read(n)
+   if d is None:
+    break
+   snd(b'dat:'+d)
+  snd(b'aen:')
+ finally:
+  nap()
 def do_sns():
  import fpga,touch
  msg='BAT %d\nCHG %s\nVER %s\nMAC %s\nTOUCH %s\nFPGA %s\nRST %s'%(device.battery_level(),device.is_charging(),device.VERSION,device.mac_address(),touch.state(),fpga.run(),device.reset_cause())
@@ -210,9 +245,14 @@ def arm():
 """
 
     val ARM = """
-import sys
+import gc,sys,bluetooth
+try:
+ bluetooth.receive_callback(None)
+except:
+ pass
 if 'op' in sys.modules:
  del sys.modules['op']
+gc.collect()
 import op
 op.arm()
 print('OP_OK')

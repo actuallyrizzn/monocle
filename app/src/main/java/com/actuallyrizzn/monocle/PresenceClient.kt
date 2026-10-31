@@ -11,6 +11,7 @@ data class QueueMessage(
     val text: String,
     val sender: String,
     val subject: String,
+    val listen: Boolean = false,
 )
 
 data class HeartbeatResult(
@@ -149,6 +150,7 @@ class PresenceClient(
                         text = text,
                         sender = m.optString("sender").ifBlank { "agent" },
                         subject = m.optString("subject").trim(),
+                        listen = m.optBoolean("listen", false),
                     )
                 }
             }

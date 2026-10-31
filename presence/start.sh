@@ -1,11 +1,11 @@
 #!/bin/bash
 # Idempotent: start Monocle presence in screen only if that screen is live.
-# Same shape as start-athena-broca.sh. Bind stays loopback-only (server.py).
-# Cron (already on moya):
-#   * * * * * /home/rizzn/sanctum/monocle-presence/start.sh >> ~/logs/monocle-presence-cron.log 2>&1
+# Bind stays loopback-only (server.py).
+# Cron example:
+#   * * * * * /path/to/presence/start.sh >> ~/logs/monocle-presence-cron.log 2>&1
 
 SESSION_NAME="monocle-presence"
-DIR="${MONOCLE_PRESENCE_DIR:-$HOME/sanctum/monocle-presence}"
+DIR="${MONOCLE_PRESENCE_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 ENV_FILE="${MONOCLE_PRESENCE_ENV:-$HOME/.config/monocle-presence.env}"
 LOG="${MONOCLE_PRESENCE_LOG:-$HOME/logs/monocle-presence.log}"
 

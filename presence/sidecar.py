@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Fallback phone-side loop: heartbeat Moya, pull queued text, paint the glass.
+"""Fallback phone-side loop: heartbeat presence, pull queued text, paint the glass.
 
-APK 0.5.0+ owns this loop. Do not run this sidecar at the same time as the APK
-presence thread — they would race on pull/ack. Keep this for when the APK is
-down. Fail-closed: if Moya is unreachable the flag goes stale on its own.
+The APK owns this loop when it is running. Do not run this sidecar at the same
+time as the APK presence thread — they would race on pull/ack. Keep this for
+when the APK is down. Fail-closed: missing URL/key or an unreachable host
+leaves the flag off.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ sys.path.insert(0, TOOLS)
 from lens_show import post_display  # noqa: E402
 
 LENS = os.environ.get("MONOCLE_LENS_URL", "http://127.0.0.1:8767").rstrip("/")
-PRESENCE = os.environ.get("MONOCLE_PRESENCE_URL", "http://127.0.0.1:8890").rstrip("/")
+PRESENCE = (os.environ.get("MONOCLE_PRESENCE_URL") or "").rstrip("/")
 KEY = (
     os.environ.get("MONOCLE_PRESENCE_API_KEY")
     or os.environ.get("MONOCLE_API_KEY")
@@ -82,8 +83,8 @@ def once() -> dict:
 
 
 def main() -> int:
-    if not KEY:
-        print("Set MONOCLE_PRESENCE_API_KEY", file=sys.stderr)
+    if not PRESENCE or not KEY:
+        print("Set MONOCLE_PRESENCE_URL and MONOCLE_PRESENCE_API_KEY", file=sys.stderr)
         return 2
     interval = float(os.environ.get("MONOCLE_SIDECAR_INTERVAL", "3"))
     if "--once" in sys.argv:

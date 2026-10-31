@@ -3,7 +3,7 @@
 
 Otto on this phone: GET /v1/status, then POST /v1/display.
 If the bridge is down or ble is false, skip (exit 0). Mark is not wearing it.
-Do not queue through Moya for these pings — empty-queue heartbeats stay quiet.
+Do not queue through presence for these pings — empty-queue heartbeats stay quiet.
 
 Exit 1 only when the lens is connected and the paint fails.
 """

@@ -1,14 +1,16 @@
 package com.actuallyrizzn.monocle
 
 /**
- * Phone → Moya heartbeat + pull. Fail-closed: if Moya is unreachable the flag
- * goes stale on its own. Only paint when BLE is actually up.
+ * Phone → presence heartbeat + pull. Fail-closed: missing config or an
+ * unreachable host leaves the flag off. Only paint when BLE is actually up.
  */
 class PresenceLoop(
     private val client: PresenceClient,
     private val connected: () -> Boolean,
     private val deviceName: () -> String?,
     private val paint: (text: String, subject: String, sender: String) -> Boolean,
+    /** When a queued card asks for a reply, record a fixed take. Null = paint only. */
+    private val ask: ((text: String, subject: String, sender: String) -> Boolean)? = null,
     private val intervalMs: Long = INTERVAL_MS,
 ) {
     @Volatile
@@ -69,6 +71,12 @@ class PresenceLoop(
     }
 
     fun tick(): Int {
+        if (!PresencePrefs.isConfigured(client.baseUrl, client.apiKey)) {
+            lastHeartbeatOk = false
+            lastOn = false
+            lastError = "presence_not_configured"
+            return 0
+        }
         val ble = connected()
         val hb = client.heartbeat(ble, deviceName())
         lastHeartbeatOk = hb.ok
@@ -89,7 +97,11 @@ class PresenceLoop(
         val ids = mutableListOf<Int>()
         for (msg in pulled.messages) {
             val ok = try {
-                paint(msg.text, msg.subject, msg.sender)
+                if (msg.listen && ask != null) {
+                    ask.invoke(msg.text, msg.subject, msg.sender)
+                } else {
+                    paint(msg.text, msg.subject, msg.sender)
+                }
             } catch (e: Exception) {
                 lastError = e.message ?: "paint_failed"
                 false

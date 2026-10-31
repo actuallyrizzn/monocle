@@ -22,6 +22,9 @@ class MonocleHttpServer(
     var presenceLoop: PresenceLoop? = null
     var presenceClient: PresenceClient? = null
     var presencePrefs: PresencePrefs? = null
+    private val recordLimitPrefs = RecordLimitPrefs(appContext)
+    @Volatile
+    private var lastHeard: Utterance? = null
 
     init {
         listen.recorder = { seconds -> recordMic(seconds) }
@@ -42,6 +45,9 @@ class MonocleHttpServer(
                 path == "v1/led" && session.method == Method.POST -> led(session)
                 path == "v1/touch" -> touch()
                 path == "v1/mic" && session.method == Method.POST -> mic(session)
+                path == "v1/ask" && session.method == Method.POST -> ask(session)
+                path == "v1/record-limit" && session.method == Method.POST -> setRecordLimit(session)
+                path == "v1/record-limit" -> recordLimitStatus()
                 path == "v1/camera" && session.method == Method.POST -> camera()
                 path == "v1/raw" -> drainRaw()
                 path == "v1/stt/phone" && session.method == Method.POST -> sttPhone()
@@ -80,6 +86,7 @@ class MonocleHttpServer(
             .put("status", ble.displayStatus())
             .put("device", ble.deviceName ?: JSONObject.NULL)
             .put("listen", listen.isRunning())
+            .put("record_limit", recordLimitPrefs.seconds())
             .put("last_speaking", u?.speaking ?: false)
             .put("presence_on", presenceLoop?.lastOn ?: false)
             .put("presence_ok", presenceLoop?.lastHeartbeatOk ?: false)
@@ -431,19 +438,83 @@ class MonocleHttpServer(
     }
 
     private fun recordMic(seconds: Double): Utterance {
-        val collected = hud.mic(seconds)
+        val take = RecordLimit.apply(seconds, recordLimitPrefs.seconds())
+        val collected = hud.mic(take)
         if (collected != null) {
             val u = MicCapture.fromPackets(collected.packets, collected.raw, 8000, 8, "OP")
-            if (u.pcm.isNotEmpty()) return u
+            // FPGA mic.read max is 127 samples. A 4-byte leftover is not a take.
+            if (u.pcm.size >= 800) return u
         }
-        val u = MicCapture.record(ble, seconds, 8000, 8)
+        val u = MicCapture.record(ble, take, 8000, 8)
         hud.rearmAfterExec()
         return u
     }
 
     private fun mic(session: IHTTPSession): Response {
-        val seconds = readJson(session).optDouble("seconds", 2.0)
-        return json(Response.Status.OK, utteranceObject(recordMic(seconds)).toString())
+        val req = readJson(session)
+        val requested = if (req.has("seconds")) req.optDouble("seconds") else null
+        val seconds = RecordLimit.apply(requested, recordLimitPrefs.seconds())
+        val u = recordMic(seconds)
+        lastHeard = u
+        return json(
+            Response.Status.OK,
+            utteranceObject(u).put("seconds", seconds).put("limit", recordLimitPrefs.seconds()).toString(),
+        )
+    }
+
+    /** Question card, then a fixed-length take. Mic off before and after. No VAD stop. */
+    fun askCard(
+        text: String,
+        subject: String = "Ask",
+        sender: String = "Athena",
+        requestedSeconds: Double? = null,
+    ): Utterance {
+        val seconds = RecordLimit.apply(requestedSeconds, recordLimitPrefs.seconds())
+        idle.cancel()
+        paint(
+            text = text.ifBlank { "Listening" },
+            subject = subject.ifBlank { "Ask" },
+            sender = sender.ifBlank { "Athena" },
+        )
+        idle.cancel()
+        val u = recordMic(seconds)
+        lastHeard = u
+        idle.bump()
+        return u
+    }
+
+    private fun ask(session: IHTTPSession): Response {
+        val req = readJson(session)
+        val requested = if (req.has("seconds")) req.optDouble("seconds") else null
+        val u = askCard(
+            text = req.optString("text").trim(),
+            subject = req.optString("subject").ifBlank { req.optString("title") }.trim(),
+            sender = req.optString("from").ifBlank { req.optString("sender") }.trim(),
+            requestedSeconds = requested,
+        )
+        val body = utteranceObject(u)
+            .put("seconds", RecordLimit.apply(requested, recordLimitPrefs.seconds()))
+            .put("limit", recordLimitPrefs.seconds())
+            .put("ask", true)
+        return json(Response.Status.OK, body.toString())
+    }
+
+    private fun recordLimitStatus(): Response {
+        val body = JSONObject()
+            .put("ok", true)
+            .put("seconds", recordLimitPrefs.seconds())
+            .put("min", RecordLimit.MIN)
+            .put("max", RecordLimit.MAX)
+            .put("default", RecordLimit.DEFAULT)
+            .toString()
+        return json(Response.Status.OK, body)
+    }
+
+    private fun setRecordLimit(session: IHTTPSession): Response {
+        val req = readJson(session)
+        val seconds = req.optDouble("seconds", RecordLimit.DEFAULT)
+        recordLimitPrefs.save(seconds)
+        return recordLimitStatus()
     }
 
     private fun drainRaw(): Response {
@@ -514,8 +585,9 @@ class MonocleHttpServer(
     }
 
     private fun listenStart(session: IHTTPSession): Response {
-        val seconds = readJson(session).optDouble("seconds", 2.0)
-        listen.start(seconds)
+        val req = readJson(session)
+        val requested = if (req.has("seconds")) req.optDouble("seconds") else null
+        listen.start(RecordLimit.apply(requested, recordLimitPrefs.seconds()))
         paint(text = "Listening", subject = "Listen", sender = "Monocle")
         return listenStatus()
     }
@@ -542,13 +614,13 @@ class MonocleHttpServer(
     }
 
     private fun utteranceJson(): Response {
-        val u = listen.lastUtterance()
+        val u = listen.lastUtterance() ?: lastHeard
             ?: return json(Response.Status.NOT_FOUND, """{"error":"no_utterance"}""")
         return json(Response.Status.OK, utteranceObject(u).toString())
     }
 
     private fun utteranceWav(): Response {
-        val u = listen.lastUtterance()
+        val u = listen.lastUtterance() ?: lastHeard
             ?: return json(Response.Status.NOT_FOUND, """{"error":"no_utterance"}""")
         val wav = u.wav()
         return newFixedLengthResponse(

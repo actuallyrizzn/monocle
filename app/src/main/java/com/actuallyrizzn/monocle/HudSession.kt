@@ -136,14 +136,19 @@ class HudSession(private val ble: MonocleBleClient) {
             CardWire.camera(),
             quietMs = 800,
             deadlineMs = 45_000,
-            emptyMs = 6_000,
+            emptyMs = 15_000,
         )
     }
 
     fun mic(seconds: Double): ReplResult? {
-        val sec = seconds.coerceIn(0.5, 4.0)
-        val deadline = (sec * 1000).toLong() + 12_000L
-        return collect(CardWire.mic(sec), quietMs = 800, deadlineMs = deadline, emptyMs = 4_000)
+        val sec = RecordLimit.clamp(seconds)
+        val wait = (sec * 1000).toLong()
+        return collect(
+            CardWire.mic(sec),
+            quietMs = 800,
+            deadlineMs = wait + 15_000L,
+            emptyMs = wait + 4_000L,
+        )
     }
 
     fun sensorsText(): String? {

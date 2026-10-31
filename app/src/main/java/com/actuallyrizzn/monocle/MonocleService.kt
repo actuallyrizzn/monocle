@@ -30,6 +30,9 @@ class MonocleService : Service() {
 
         @Volatile
         var presence: PresenceLoop? = null
+
+        @Volatile
+        var presenceClient: PresenceClient? = null
     }
 
     private var http: MonocleHttpServer? = null
@@ -91,6 +94,10 @@ class MonocleService : Service() {
                     )
                     !out.startsWith("ERROR:")
                 },
+                ask = { text, subject, sender ->
+                    server.askCard(text, subject, sender)
+                    true
+                },
             )
             server.presenceLoop = hb
             server.presenceClient = presenceClient
@@ -100,6 +107,7 @@ class MonocleService : Service() {
             bleClient.onConnected = { http?.onLensUp() }
             presenceLoop = hb
             presence = hb
+            Companion.presenceClient = presenceClient
             hb.start()
             isRunning = true
             notifyUi.removeCallbacks(notifyTick)
@@ -131,6 +139,7 @@ class MonocleService : Service() {
         presenceLoop?.stop()
         presenceLoop = null
         presence = null
+        presenceClient = null
         listen?.stop()
         listen = null
         try {

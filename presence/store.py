@@ -74,7 +74,13 @@ class PresenceStore:
                     self.battery = None
             return self._status_locked()
 
-    def send(self, text: str, sender: str = "agent", subject: str = "") -> Dict[str, Any]:
+    def send(
+        self,
+        text: str,
+        sender: str = "agent",
+        subject: str = "",
+        listen: bool = False,
+    ) -> Dict[str, Any]:
         body = (text or "").strip()
         if not body:
             return {"ok": False, "error": "missing_text", "on": self.status()["on"]}
@@ -93,6 +99,7 @@ class PresenceStore:
                 "text": body,
                 "sender": (sender or "agent").strip() or "agent",
                 "subject": (subject or "").strip(),
+                "listen": bool(listen),
                 "created_at": self._now(),
             }
             self._queue.append(item)

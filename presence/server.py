@@ -119,10 +119,14 @@ class PresenceHandler(BaseHTTPRequestHandler):
             )
             return
         if path == "/v1/send":
+            listen = body.get("listen", False)
+            if isinstance(listen, str):
+                listen = listen.strip().lower() in ("1", "true", "yes", "on")
             result = self.store.send(
                 str(body.get("text") or ""),
                 sender=str(body.get("sender") or "agent"),
                 subject=str(body.get("subject") or ""),
+                listen=bool(listen),
             )
             code = 200 if result.get("ok") else (409 if result.get("error") == "monocle_off" else 400)
             self._send(code, result)

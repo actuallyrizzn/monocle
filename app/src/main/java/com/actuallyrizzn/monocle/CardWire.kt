@@ -43,7 +43,11 @@ object CardWire {
     fun camera(): ByteArray = tag("cam:")
 
     fun mic(seconds: Double): ByteArray {
-        val sec = String.format(java.util.Locale.US, "%.1f", seconds.coerceIn(0.5, 4.0))
+        val sec = String.format(
+            java.util.Locale.US,
+            "%.1f",
+            RecordLimit.clamp(seconds),
+        )
         return tag("mic:") + sec.toByteArray(Charsets.US_ASCII)
     }
 
