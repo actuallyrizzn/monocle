@@ -5,13 +5,13 @@ package com.actuallyrizzn.monocle
  * Phone sends 4-byte tags on the raw data service (Noa photo.py / audio.py / main.py).
  */
 object HudScript {
-    const val VERSION = "op-v1"
+    const val VERSION = "op-v2"
     const val FILE = "op.py"
     const val CHUNK_BYTES: Int = 64
 
     const val SOURCE = """
-# op-v1
-import bluetooth,display,device,camera,microphone,touch,led,fpga,time
+# op-v2
+import bluetooth,device,time
 COLS=26
 BAT_COLS=4
 SUBJ_COLS=21
@@ -28,6 +28,14 @@ def snd(m):
    break
   except OSError:
    pass
+def wake():
+ h=getattr(device,'hibernate',None)
+ if h and h():
+  h(False)
+def nap():
+ h=getattr(device,'hibernate',None)
+ if h:
+  h(True)
 def clip(s,n):
  s=s.replace('\r',' ').replace('\n',' ').strip() or ' '
  if len(s)<=n:
@@ -61,23 +69,39 @@ def wrap(t):
   lines.append(cur)
  return lines or [' ']
 def blank():
- display.clear()
- display.brightness(0)
+ nap()
 def paint(subj,who,text):
+ wake()
+ import display
  display.brightness(BRIGHT)
  S=clip(subj,SUBJ_COLS)
  W=clip(who,COLS)
- B=wrap(text)[:BODY_ROWS]
+ B=wrap(text)
  b=str(device.battery_level())+'%'
  if len(b)>BAT_COLS:
   b=b[:BAT_COLS]
  bx=640-len(b)*24
- o=[display.Text(S,0,0,0x29D0D0),display.Text(b,bx,0,0xFFEE33),display.Text(W,0,LINE_H,0xFFEE33)]
- i=0
- while i<len(B):
-  o.append(display.Text(B[i],0,BODY_Y+i*LINE_H,0xFFFFFF))
-  i+=1
- display.show(o)
+ def chrome():
+  return [display.Text(S,0,0,0x29D0D0),display.Text(b,bx,0,0xFFEE33),display.Text(W,0,LINE_H,0xFFEE33)]
+ def fr(s):
+  o=chrome()
+  i=0
+  while i<BODY_ROWS:
+   if s+i>=len(B):
+    break
+   o.append(display.Text(B[s+i],0,BODY_Y+i*LINE_H,0xFFFFFF))
+   i+=1
+  display.show(o)
+ if len(B)<=BODY_ROWS:
+  fr(0)
+ else:
+  w=len(B)-BODY_ROWS+1
+  s=0
+  while s<w:
+   fr(s)
+   time.sleep(1.8)
+   s+=1
+  nap()
 def dec(x):
  try:
   return x.decode('utf-8')
@@ -90,21 +114,28 @@ def parse(raw):
   return
  paint(dec(parts[0]),dec(parts[1]),dec(SEP.join(parts[2:])))
 def do_cam():
- camera.capture()
- snd(b'ist:')
- time.sleep(0.25)
- n=bluetooth.max_length()-4
- sent=0
- i=0
- while i<2000 and sent<200000:
-  d=camera.read(n)
-  if d is None:
-   break
-  snd(b'idt:'+d)
-  sent+=len(d)
-  i+=1
- snd(b'ien:')
+ wake()
+ import camera
+ try:
+  camera.capture()
+  snd(b'ist:')
+  time.sleep(0.25)
+  n=bluetooth.max_length()-4
+  sent=0
+  i=0
+  while i<2000 and sent<200000:
+   d=camera.read(n)
+   if d is None:
+    break
+   snd(b'idt:'+d)
+   sent+=len(d)
+   i+=1
+  snd(b'ien:')
+ finally:
+  nap()
 def do_mic(rest):
+ wake()
+ import microphone
  try:
   sec=float(dec(rest) or '2')
  except:
@@ -124,9 +155,11 @@ def do_mic(rest):
   snd(b'dat:'+d)
  snd(b'aen:')
 def do_sns():
+ import fpga,touch
  msg='BAT %d\nCHG %s\nVER %s\nMAC %s\nTOUCH %s\nFPGA %s\nRST %s'%(device.battery_level(),device.is_charging(),device.VERSION,device.mac_address(),touch.state(),fpga.run(),device.reset_cause())
  snd(b'sns:'+msg.encode())
 def do_led(rest):
+ import led
  s=dec(rest).upper()
  col=led.RED if s[:1]=='R' else led.GREEN
  if ('0' in s) or s.endswith('OFF'):
@@ -134,6 +167,7 @@ def do_led(rest):
  else:
   led.on(col)
 def do_tqs():
+ import touch
  snd(b'tch:'+str(touch.state()).encode())
 def on_raw(m):
  global acc
@@ -152,6 +186,8 @@ def on_raw(m):
  elif tag==b'clr:':
   blank()
  elif tag==b'brt:' and rest:
+  wake()
+  import display
   try:
    display.brightness(int(rest.decode()))
   except:

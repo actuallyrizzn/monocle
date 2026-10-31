@@ -13,8 +13,8 @@ android {
         applicationId = "com.actuallyrizzn.monocle"
         minSdk = 26
         targetSdk = 34
-        versionCode = 35
-        versionName = "0.5.26"
+        versionCode = 36
+        versionName = "0.5.27"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val localProps = Properties()
         val lp = rootProject.file("local.properties")

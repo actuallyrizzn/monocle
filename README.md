@@ -20,7 +20,7 @@ python3 "$HOME/.otto-portable/tools/termux-single-file-serve/serve.py" \
 
 Do **not** copy the APK to Downloads. Force-stop **Noa** before Start. Grant Bluetooth (and mic if you want the phone-STT fallback). Leave the notification running.
 
-Current app: **0.5.26**. Loopback HTTP: `http://127.0.0.1:8767` (not 8765).
+Current app: **0.5.27**. Loopback HTTP: `http://127.0.0.1:8767` (not 8765).
 
 Idle uses `device.hibernate` (Bluetooth stays; FPGA / 10V / camera analog off). Application-only DFU (`POST /v1/firmware`). Do not flash below **40%**. Recovery zip is Brilliant’s GitHub **v23.248.0754** release.
 
@@ -39,7 +39,8 @@ On BLE up: connect splash, then blank after 20s. Camera snaps re-init the sensor
 | `POST /v1/led` | `{color:GREEN\|RED, on:true}` |
 | `GET /v1/touch` | Touch pads right now |
 | `POST /v1/mic` | `{seconds:2}` glasses mic → WAV + VAD |
-| `POST /v1/camera` | JPEG snapshot (Noa `ist:`/`idt:`/`ien:`) |
+| `POST /v1/camera` | JPEG snapshot (operator `cam:` when armed, else REPL) |
+| `POST /v1/operator` | Write `op.py` in small pastes and ARM |
 | `POST /v1/firmware/zip` | Stage an application DFU zip |
 | `POST /v1/firmware` | Flash staged zip (or bundled) |
 | `POST /v1/listen/start` | Loop: record, energy-VAD, keep last WAV |

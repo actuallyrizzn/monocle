@@ -10,7 +10,7 @@ class HudScriptTest {
     @Test
     fun residentOperatorOwnsTheDevice() {
         val src = HudScript.SOURCE
-        assertTrue(src.contains("# op-v1"))
+        assertTrue(src.contains("# op-v2"))
         assertTrue(src.contains("bluetooth.receive_callback"))
         assertTrue(src.contains("b'crd:'"))
         assertTrue(src.contains("b'clr:'"))
@@ -29,10 +29,15 @@ class HudScriptTest {
         assertTrue(src.contains("battery_level"))
         assertTrue(src.contains("camera.capture()"))
         assertTrue(src.contains("microphone.record"))
+        assertTrue(src.contains("def wake()"))
+        assertTrue(src.contains("def nap()"))
+        assertTrue(src.indexOf("import camera") > src.indexOf("def do_cam()"))
+        assertTrue(src.contains("finally:"))
         assertTrue(HudScript.ARM.contains("import op"))
         assertTrue(HudScript.CHECK.contains("while line==''"))
         assertTrue(HudScript.PROBE.contains("PROBE"))
-        assertEquals("op-v1", HudScript.VERSION)
+        assertEquals("op-v2", HudScript.VERSION)
+        assertFalse(src.trimIndent().startsWith("import camera"))
         assertFalse(HudScript.replFailed("OPEN\nWROTE 12"))
         assertTrue(HudScript.replFailed("Traceback (most recent call last):"))
         assertTrue(HudScript.replFailed("ERROR: not connected"))
