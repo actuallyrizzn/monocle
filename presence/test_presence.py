@@ -82,6 +82,23 @@ class StoreTests(unittest.TestCase):
         s.heartbeat(True)
         self.assertEqual(s.send("  ")["error"], "missing_text")
 
+    def test_heartbeat_returns_queued_cards(self):
+        s = PresenceStore(clock=FakeClock())
+        s.heartbeat(True)
+        s.send("Order up", sender="otto")
+        st = s.heartbeat(True)
+        self.assertEqual(st["messages"][0]["text"], "Order up")
+        st = s.heartbeat(True, ack_ids=[st["messages"][0]["id"]])
+        self.assertEqual(st["messages"], [])
+
+    def test_heartbeat_off_returns_no_messages(self):
+        s = PresenceStore(clock=FakeClock())
+        s.heartbeat(True)
+        s.send("secret")
+        st = s.heartbeat(False)
+        self.assertFalse(st["on"])
+        self.assertEqual(st["messages"], [])
+
 
 class HttpTests(unittest.TestCase):
     def setUp(self):
@@ -137,6 +154,16 @@ class HttpTests(unittest.TestCase):
         code, body = self.call("POST", "/v1/send", {"text": "nope"})
         self.assertEqual(code, 409)
         self.assertEqual(body["error"], "monocle_off")
+
+    def test_heartbeat_carries_cards_and_acks(self):
+        self.call("POST", "/v1/heartbeat", {"ble": True})
+        self.call("POST", "/v1/send", {"text": "Fryer ping", "sender": "rico"})
+        code, body = self.call("POST", "/v1/heartbeat", {"ble": True})
+        self.assertEqual(code, 200)
+        self.assertEqual(body["messages"][0]["text"], "Fryer ping")
+        mid = body["messages"][0]["id"]
+        code, body = self.call("POST", "/v1/heartbeat", {"ble": True, "ack_ids": [mid]})
+        self.assertEqual(body["messages"], [])
 
 
 if __name__ == "__main__":

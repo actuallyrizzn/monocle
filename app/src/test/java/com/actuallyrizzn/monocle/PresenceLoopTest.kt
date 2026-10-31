@@ -14,8 +14,10 @@ class PresenceLoopTest {
     ) {
         val calls = mutableListOf<String>()
         val painted = mutableListOf<Triple<String, String, String>>()
+        val bodies = mutableListOf<String?>()
         val client = PresenceClient("http://127.0.0.1:8890", "k") { method, url, _, body ->
             calls += "$method ${url.substringAfterLast('/')}"
+            bodies += body
             when {
                 url.endsWith("/v1/heartbeat") -> heartbeat
                 url.endsWith("/v1/pull") -> pull
@@ -37,12 +39,16 @@ class PresenceLoopTest {
     @Test
     fun paintsAndAcksWhenOn() {
         val f = Fake(
-            pull = """{"ok":true,"on":true,"messages":[{"id":3,"text":"Order up","sender":"Otto","subject":"Kitchen"}]}""",
+            heartbeat = """{"ok":true,"on":true,"messages":[{"id":3,"text":"Order up","sender":"Otto","subject":"Kitchen"}]}""",
         )
         assertEquals(1, f.loop.tick())
         assertEquals(listOf(Triple("Order up", "Kitchen", "Otto")), f.painted)
         assertTrue(f.loop.lastOn)
-        assertTrue(f.calls.contains("POST ack"))
+        assertEquals(listOf("POST heartbeat"), f.calls)
+        f.heartbeat = """{"ok":true,"on":true,"messages":[]}"""
+        assertEquals(0, f.loop.tick())
+        assertTrue(f.bodies[1]!!.contains("\"ack_ids\""))
+        assertTrue(f.bodies[1]!!.contains("3"))
     }
 
     @Test
@@ -108,10 +114,8 @@ class PresenceLoopTest {
         val asked = mutableListOf<String>()
         val client = PresenceClient("http://127.0.0.1:8890", "k") { method, url, _, _ ->
             when {
-                url.endsWith("/v1/heartbeat") -> """{"ok":true,"on":true}"""
-                url.endsWith("/v1/pull") ->
+                url.endsWith("/v1/heartbeat") ->
                     """{"ok":true,"on":true,"messages":[{"id":7,"text":"Say the word","sender":"Athena","subject":"Ask","listen":true}]}"""
-                url.endsWith("/v1/ack") -> """{"ok":true,"removed":1}"""
                 else -> error("$method $url")
             }
         }
@@ -131,12 +135,13 @@ class PresenceLoopTest {
 
     @Test
     fun failedPaintIsNotAcked() {
-        val client = PresenceClient("http://127.0.0.1:8890", "k") { method, url, _, _ ->
+        var sawAck = false
+        val client = PresenceClient("http://127.0.0.1:8890", "k") { method, url, _, body ->
             when {
-                url.endsWith("/v1/heartbeat") -> """{"ok":true,"on":true}"""
-                url.endsWith("/v1/pull") ->
+                url.endsWith("/v1/heartbeat") -> {
+                    if (body != null && body.contains("ack_ids")) sawAck = true
                     """{"ok":true,"on":true,"messages":[{"id":9,"text":"nope","sender":"x","subject":"y"}]}"""
-                url.endsWith("/v1/ack") -> error("ack should not run")
+                }
                 else -> error("$method $url")
             }
         }
@@ -148,5 +153,7 @@ class PresenceLoopTest {
         )
         assertEquals(0, loop.tick())
         assertTrue(loop.lastOn)
+        loop.tick()
+        assertFalse(sawAck)
     }
 }

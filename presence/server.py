@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Loopback HTTP for Monocle presence. Bind localhost only. Auth is Bearer / X-API-Key."""
+"""Monocle presence relay. Phone dials out; cards come back on that response.
+
+Broca web-chat / Otto HTTP bridge shape: the device is a client, never a
+server. Bind defaults to localhost (Athena SMCP on the same box). A public
+HTTPS reverse proxy can sit in front — the phone still only makes outbound
+HTTPS. Auth is Bearer / X-API-Key.
+"""
 
 from __future__ import annotations
 
@@ -109,12 +115,17 @@ class PresenceHandler(BaseHTTPRequestHandler):
             ble = body.get("ble", False)
             if isinstance(ble, str):
                 ble = ble.strip().lower() in ("1", "true", "yes", "on")
+            ack_ids = body.get("ack_ids") or []
+            if ack_ids and not isinstance(ack_ids, list):
+                self._send(400, {"ok": False, "error": "ack_ids_must_be_list"})
+                return
             self._send(
                 200,
                 self.store.heartbeat(
                     bool(ble),
                     device=body.get("device"),
                     battery=body.get("battery"),
+                    ack_ids=ack_ids or None,
                 ),
             )
             return

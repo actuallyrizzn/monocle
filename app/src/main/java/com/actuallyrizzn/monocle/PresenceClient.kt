@@ -18,6 +18,7 @@ data class HeartbeatResult(
     val ok: Boolean,
     val on: Boolean,
     val queueLen: Int? = null,
+    val messages: List<QueueMessage> = emptyList(),
     val error: String? = null,
 )
 
@@ -76,13 +77,23 @@ class PresenceClient(
     @Volatile var apiKey: String,
     private val transport: PresenceTransport = HttpPresenceTransport(),
 ) {
-    fun heartbeat(ble: Boolean, device: String?, battery: Int? = null): HeartbeatResult {
+    fun heartbeat(
+        ble: Boolean,
+        device: String?,
+        battery: Int? = null,
+        ackIds: List<Int> = emptyList(),
+    ): HeartbeatResult {
         if (apiKey.isBlank()) {
             return HeartbeatResult(ok = false, on = false, error = "missing_api_key")
         }
         val body = JSONObject().put("ble", ble)
         if (!device.isNullOrBlank()) body.put("device", device)
         if (battery != null) body.put("battery", battery)
+        if (ackIds.isNotEmpty()) {
+            val arr = JSONArray()
+            for (id in ackIds) arr.put(id)
+            body.put("ack_ids", arr)
+        }
         return try {
             parseHeartbeat(transport.request("POST", url("/v1/heartbeat"), apiKey, body.toString()))
         } catch (e: Exception) {
@@ -130,6 +141,7 @@ class PresenceClient(
                 ok = ok,
                 on = json.optBoolean("on", false),
                 queueLen = queueLen,
+                messages = parseMessages(json.optJSONArray("messages")),
                 error = if (ok) null else err ?: "error",
             )
         }
@@ -138,28 +150,30 @@ class PresenceClient(
             val json = JSONObject(raw)
             val err = json.optString("error").ifBlank { null }
             val ok = json.optBoolean("ok", err == null)
-            val messages = mutableListOf<QueueMessage>()
-            val arr = json.optJSONArray("messages")
-            if (arr != null) {
-                for (i in 0 until arr.length()) {
-                    val m = arr.optJSONObject(i) ?: continue
-                    val text = m.optString("text").trim()
-                    if (text.isEmpty()) continue
-                    messages += QueueMessage(
-                        id = m.optInt("id"),
-                        text = text,
-                        sender = m.optString("sender").ifBlank { "agent" },
-                        subject = m.optString("subject").trim(),
-                        listen = m.optBoolean("listen", false),
-                    )
-                }
-            }
             return PullResult(
                 ok = ok,
                 on = json.optBoolean("on", false),
-                messages = messages,
+                messages = parseMessages(json.optJSONArray("messages")),
                 error = if (ok) null else err ?: "error",
             )
+        }
+
+        private fun parseMessages(arr: JSONArray?): List<QueueMessage> {
+            if (arr == null) return emptyList()
+            val messages = mutableListOf<QueueMessage>()
+            for (i in 0 until arr.length()) {
+                val m = arr.optJSONObject(i) ?: continue
+                val text = m.optString("text").trim()
+                if (text.isEmpty()) continue
+                messages += QueueMessage(
+                    id = m.optInt("id"),
+                    text = text,
+                    sender = m.optString("sender").ifBlank { "agent" },
+                    subject = m.optString("subject").trim(),
+                    listen = m.optBoolean("listen", false),
+                )
+            }
+            return messages
         }
 
         fun parseAck(raw: String): AckResult {

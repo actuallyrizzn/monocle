@@ -60,8 +60,23 @@ class PresenceStore:
         ble: bool,
         device: Optional[str] = None,
         battery: Optional[int] = None,
+        ack_ids: Optional[List[int]] = None,
     ) -> Dict[str, Any]:
+        """Phone outbound tick: I'm here, ack last cards, give me what's queued.
+
+        Same shape as Broca's web-chat / Otto HTTP bridge: the device dials;
+        instructions come back on that response. Nothing connects inbound.
+        """
         with self._lock:
+            if ack_ids:
+                wanted = set()
+                for raw in ack_ids:
+                    try:
+                        wanted.add(int(raw))
+                    except (TypeError, ValueError):
+                        continue
+                if wanted:
+                    self._queue = [m for m in self._queue if m["id"] not in wanted]
             self.last_heartbeat_at = self._now()
             self.ble = bool(ble)
             if device is not None:
@@ -72,7 +87,9 @@ class PresenceStore:
                     self.battery = int(battery)
                 except (TypeError, ValueError):
                     self.battery = None
-            return self._status_locked()
+            st = self._status_locked()
+            st["messages"] = [dict(m) for m in self._queue] if st["on"] else []
+            return st
 
     def send(
         self,

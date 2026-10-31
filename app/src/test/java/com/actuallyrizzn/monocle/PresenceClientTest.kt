@@ -8,10 +8,14 @@ import org.junit.Test
 class PresenceClientTest {
     @Test
     fun parseHeartbeatOn() {
-        val r = PresenceClient.parseHeartbeat("""{"ok":true,"on":true,"ble":true,"queue_len":0}""")
+        val r = PresenceClient.parseHeartbeat(
+            """{"ok":true,"on":true,"ble":true,"queue_len":1,"messages":[{"id":3,"text":"hi","sender":"otto","subject":"x"}]}""",
+        )
         assertTrue(r.ok)
         assertTrue(r.on)
-        assertEquals(0, r.queueLen)
+        assertEquals(1, r.queueLen)
+        assertEquals(1, r.messages.size)
+        assertEquals("hi", r.messages[0].text)
     }
 
     @Test

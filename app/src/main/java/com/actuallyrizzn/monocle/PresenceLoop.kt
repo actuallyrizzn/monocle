@@ -1,8 +1,9 @@
 package com.actuallyrizzn.monocle
 
 /**
- * Phone → presence heartbeat + pull. Fail-closed: missing config or an
- * unreachable host leaves the flag off. Only paint when BLE is actually up.
+ * Phone dials the presence relay (outbound HTTPS). Cards come back on that
+ * response — Broca web-chat / Otto HTTP bridge shape. The phone never listens.
+ * Fail-closed: missing config or an unreachable host leaves the flag off.
  */
 class PresenceLoop(
     private val client: PresenceClient,
@@ -33,6 +34,7 @@ class PresenceLoop(
     var lastHeartbeatOk: Boolean = false
         private set
 
+    private val pendingAck = mutableListOf<Int>()
     private var thread: Thread? = null
 
     companion object {
@@ -78,24 +80,20 @@ class PresenceLoop(
             return 0
         }
         val ble = connected()
-        val hb = client.heartbeat(ble, deviceName())
+        val acks = synchronized(pendingAck) { pendingAck.toList() }
+        val hb = client.heartbeat(ble, deviceName(), ackIds = acks)
         lastHeartbeatOk = hb.ok
         lastOn = hb.ok && hb.on && ble
         lastError = hb.error
-        if (!hb.ok || !ble || !hb.on) {
-            return 0
+        if (hb.ok && acks.isNotEmpty()) {
+            synchronized(pendingAck) { pendingAck.removeAll(acks.toSet()) }
         }
-        if (hb.queueLen == 0) {
+        if (!hb.ok || !ble || !hb.on) {
             lastShown = 0
             return 0
         }
-        val pulled = client.pull()
-        if (!pulled.ok) {
-            lastError = pulled.error
-            return 0
-        }
         val ids = mutableListOf<Int>()
-        for (msg in pulled.messages) {
+        for (msg in hb.messages) {
             val ok = try {
                 if (msg.listen && ask != null) {
                     ask.invoke(msg.text, msg.subject, msg.sender)
@@ -109,10 +107,7 @@ class PresenceLoop(
             if (ok && msg.id != 0) ids += msg.id
         }
         if (ids.isNotEmpty()) {
-            val ack = client.ack(ids)
-            if (!ack.ok) {
-                lastError = ack.error
-            }
+            synchronized(pendingAck) { pendingAck.addAll(ids) }
         }
         lastShown = ids.size
         return ids.size

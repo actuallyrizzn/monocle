@@ -18,9 +18,9 @@ bash tools/assemble-debug-on-termux.sh
 
 Install the debug APK from `app/build/outputs/apk/debug/MONOCLE-BRIDGE.apk`. Do **not** copy it to Downloads. Force-stop **Noa** before Start. Grant Bluetooth (and mic if you want the phone-STT fallback). Leave the notification running.
 
-Current app: **0.5.31**. Loopback HTTP: `http://127.0.0.1:8767` (not 8765).
+Current app: **0.5.32**. Loopback HTTP: `http://127.0.0.1:8767` (not 8765).
 
-Presence (optional) is **not** compiled in. Set the presence URL and API key on the app screen, or `POST /v1/presence/config` with `{url, key}`. Empty config means the heartbeat stays off.
+Presence (optional) is **not** compiled in. The phone **only dials out** — Broca web-chat / Otto HTTP bridge shape. `POST /v1/heartbeat` is “I’m here”; queued cards come back on that response. Agents enqueue with `POST /v1/send`. Nothing connects inbound to the phone. Set the relay URL and API key on the app screen, or `POST /v1/presence/config` with `{url, key}`. Empty config means the heartbeat stays off.
 
 Idle uses `device.hibernate` (Bluetooth stays; FPGA / 10V / camera analog off). Application-only DFU (`POST /v1/firmware`). Do not flash below **40%**. Recovery zip is Brilliant’s GitHub **v23.248.0754** release.
 

@@ -11,8 +11,8 @@ android {
         applicationId = "com.actuallyrizzn.monocle"
         minSdk = 26
         targetSdk = 34
-        versionCode = 40
-        versionName = "0.5.31"
+        versionCode = 41
+        versionName = "0.5.32"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
